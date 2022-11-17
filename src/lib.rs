@@ -1,9 +1,29 @@
-use std::{net::{TcpStream, ToSocketAddrs}, io::{Write, BufReader, BufRead}};
+use std::{net::{TcpStream, ToSocketAddrs, UdpSocket, SocketAddr}, io::{Write, BufReader, BufRead}};
 use anyhow::{Result, bail, anyhow};
+
+mod scanner;
+
+pub use scanner::Scanner;
 
 pub struct FlashForge {
     sock: TcpStream,
     buf: BufReader<TcpStream>,
+}
+
+#[derive(Debug)]
+pub struct V3<T> {
+    pub x: T,
+    pub y: T,
+    pub z: T,
+}
+
+#[derive(Debug)]
+pub struct Status {
+    pub endstop: V3<bool>,
+    pub status: String,
+    pub movemode: String,
+    pub led: bool,
+    pub file: String,
 }
 
 #[derive(Debug)]
@@ -18,6 +38,7 @@ pub struct Temperatures {
     pub    bed: Option<Temperature>,
 }
 
+
 impl FlashForge {
     pub fn new<A: ToSocketAddrs>(addr: A) -> Result<Self> {
         let sock = TcpStream::connect(addr)?;
@@ -29,9 +50,13 @@ impl FlashForge {
         Ok(forge)
     }
 
-    pub fn command(&mut self, cmd: &str) -> Result<String> {
+    pub fn command(&mut self, cmd: &str, args: &str) -> Result<String> {
         self.sock.write_all(b"~")?;
         self.sock.write_all(cmd.as_bytes())?;
+        if args != "" {
+            self.sock.write_all(b" ")?;
+            self.sock.write_all(args.as_bytes())?;
+        }
         self.sock.write_all(b"\r\n")?;
 
         let expected = format!("CMD {} Received.\r\n", cmd);
@@ -60,11 +85,47 @@ impl FlashForge {
 
     }
 
+    pub fn info(&mut self) -> Result<String> {
+        self.command("M115", "")
+    }
+
+    pub fn led(&mut self, rgb: (u8,u8,u8)) -> Result<()> {
+        todo!()
+    }
+
+    pub fn login(&mut self) -> Result<()> {
+        let reply = self.command("M601", "S1")?;
+        if reply.starts_with("Control Success") { 
+            Ok(())
+        } else {
+            bail!("Unexpected reply to M601: {}", reply)
+        }
+    }
+
+    pub fn logout(&mut self) -> Result<()> {
+        let reply = self.command("M602", "")?;
+        if reply.starts_with("Control Release") {
+            Ok(())
+        } else {
+            bail!("Unexpected reply to M602: {}", reply)
+        }
+    }
+
+    pub fn status(&mut self) -> Result<Status> {
+
+        let reply = self.command("M119", "")?;
+
+        let lines: Vec<_> = reply.lines().collect();
+
+        todo!()
+
+    }
+
     pub fn temperature(&mut self) -> Result<Temperatures> {
 
         let (mut nozzle, mut bed) = (None, None);
 
-        for item in self.command("M105")?.trim().split_whitespace() {
+        for item in self.command("M105", "")?.trim().split_whitespace() {
             let (key, rest) = item.split_once(':').ok_or(anyhow!("Unknown M105 reply format"))?;
             let (current, target) = rest.split_once('/').ok_or(anyhow!("Unknown M105 reply format"))?;
 
