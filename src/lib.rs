@@ -128,12 +128,15 @@ impl FlashForge {
 
     pub fn preview(&mut self, file: &str) -> Result<Vec<u8>> {
         // M662 [filename]
+        self.command("M662", file)?;
+
         todo!()
     }
 
     pub fn progress(&mut self) -> Result<u8> {
         let out = self.command("M27", "")?;
-        Ok(out.strip_prefix("SD printing byte ").ok_or_else(|| anyhow!("Could not understand M27 output: {:?}", out))?
+        Ok(out.trim_end()
+              .strip_prefix("SD printing byte ").ok_or_else(|| anyhow!("Could not understand M27 output: {:?}", out))?
               .strip_suffix("/100").ok_or_else(|| anyhow!("Could not understand M27 output: {:?}", out))?
             .parse()?)
     }

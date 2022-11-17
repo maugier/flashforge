@@ -27,7 +27,6 @@ Check printer status:
 $ flfctl status
 Status: READY
   Head: READY
-   LED: ON
  Stops: X ON / Y off / Z off
   File:
 Nozzle:  25/0 °C
