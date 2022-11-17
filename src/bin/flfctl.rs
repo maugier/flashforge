@@ -1,6 +1,6 @@
 use anyhow::Result;
-use ffctl::{FlashForge, Temperature, Scanner, Temperatures};
-use colored::Colorize;
+use ffctl::{FlashForge, Temperature, Scanner, Temperatures, Status};
+use colored::{Colorize, ColoredString};
 use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser)]
@@ -22,8 +22,8 @@ enum Commands {
     /// Check printer status
     Status,
 
-    /// Check nozzle and hotbed temperature
-    Temp,
+    /// List files in internal storage
+    Ls,
 
     /// Turn the LED on or off
     Led { #[arg(value_enum)] on: OnOff },
@@ -32,7 +32,7 @@ enum Commands {
     Rename { name: String }
 }
 
-#[derive(Debug,Clone,Copy,ValueEnum)]
+#[derive(Debug,Clone,Copy,ValueEnum,PartialEq,Eq)]
 enum OnOff {
     On, Off
 }
@@ -51,21 +51,19 @@ fn main() -> Result<()> {
             println!("{}", machine.info()?.trim_end());
         },
         Commands::Led { on } => {
-            let args = match on {
-                OnOff::On  => "r255 g255 b255 F0", 
-                OnOff::Off => "r0 g0 b0 F0",
+            let rgb = match on {
+                OnOff::On  => (255,255,255), 
+                OnOff::Off => (0,0,0),
             };
-            FlashForge::new(address)?
-                .command("M146", args)?;
-        },
-        Commands::Temp => {
-            let mut machine = FlashForge::new(address)?;
-            print_temperatures(&machine.temperature()?);
+            FlashForge::new(address)?.led(rgb)?;
         },
         Commands::Status => {
             let mut machine = FlashForge::new(address)?;
             let status = machine.status()?;
-            println!("{:?}", status);
+            let temp = machine.temperature()?;
+
+            print_status(&status);
+            print_temperatures(&temp);
         },
         Commands::Scan { timeout } => {
             for result in Scanner::scan(timeout)? {
@@ -73,7 +71,11 @@ fn main() -> Result<()> {
                 println!("{}\t{}", result.address, result.machine_name)
             }
         },
-        Commands::Rename { name } => { FlashForge::new(address)?.rename(&name)? }
+        Commands::Rename { name } => { FlashForge::new(address)?.rename(&name)? },
+        Commands::Ls => {
+            todo!()
+        },
+        
 
     }
 
@@ -81,9 +83,30 @@ fn main() -> Result<()> {
 
 }
 
+fn colorize(s: &str) -> ColoredString {
+    match s {
+        "READY" => s.green(),
+        "MOVING" => s.bold().yellow(),
+        "BUILDING_FROM_SD" => s.bold().yellow(),
+        _ => s.into(),
+    }
+}
+
+fn onoff(x: bool) -> ColoredString {
+    if x { "ON".bold().red() } else { "off".blue() }
+}
+
+fn print_status(s: &Status) {
+    println!("Status: {}", colorize(&s.status));
+    println!("  Head: {}", colorize(&s.movemode));
+    println!("   LED: {}", onoff(s.led));
+    println!(" Stops: X {} / Y {} / Z {}", onoff(s.endstop.x), onoff(s.endstop.y), onoff(s.endstop.z));
+    println!("  File: {}", &s.file)
+}
+
 fn print_temperatures(t: &Temperatures) {
-    if let Some(nozzle) = &t.nozzle { print_temperature("nozzle", nozzle) }
-    if let Some(bed) = &t.bed { print_temperature("bed", bed) }
+    if let Some(nozzle) = &t.nozzle { print_temperature("Nozzle", nozzle) }
+    if let Some(bed) = &t.bed { print_temperature("Bed", bed) }
 }
 
 fn print_temperature(name: &str, t: &Temperature) {

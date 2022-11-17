@@ -89,7 +89,8 @@ impl FlashForge {
     }
 
     pub fn led(&mut self, rgb: (u8,u8,u8)) -> Result<()> {
-        todo!()
+         self.command("M146", &format!("r{} g{} b{} F0", rgb.0, rgb.1, rgb.2))?;
+         Ok(())
     }
 
     pub fn login(&mut self) -> Result<()> {
@@ -159,11 +160,29 @@ impl FromStr for Status {
                 .tuples().next()
                 .ok_or_else(|| anyhow!("Not enough blocks in endstop line: {}", &lines[0]))?;
 
-        let x: u8 = x.strip_prefix("X-max:").ok_or_else(|| anyhow!("no x-max"))?.parse()?;
-        let y: u8 = y.strip_prefix("Y-max:").ok_or_else(|| anyhow!("no y-max"))?.parse()?;
-        let z: u8 = z.strip_prefix("Z-max:").ok_or_else(|| anyhow!("no z-max"))?.parse()?;
+        let x = x.strip_prefix("X-max:").ok_or_else(|| anyhow!("no x-max"))?.parse::<u8>()? > 0;
+        let y = y.strip_prefix("Y-max:").ok_or_else(|| anyhow!("no y-max"))?.parse::<u8>()? > 0;
+        let z = z.strip_prefix("Z-max:").ok_or_else(|| anyhow!("no z-max"))?.parse::<u8>()? > 0;
 
-        todo!()
+        let endstop = V3 { x, y, z };
+
+        let status = lines[1].strip_prefix("MachineStatus: ")
+                             .ok_or_else(|| anyhow!("bad MachineStatus line: {}", &lines[1]))?
+                             .to_owned();
+
+        let movemode = lines[2].strip_prefix("MoveMode: ")
+                             .ok_or_else(|| anyhow!("bad MoveMode line: {}", &lines[2]))?
+                             .to_owned();
+
+        let led = lines[4].strip_prefix("LED: ")
+                          .ok_or_else(|| anyhow!("bad LED line: {}", &lines[4]))?
+                          .parse::<u8>()? > 0;
+
+        let file = lines[5].strip_prefix("CurrentFile: ")
+                           .ok_or_else(|| anyhow!("bad CurrentFile line: {}", &lines[5]))?
+                           .to_owned();
+
+        Ok( Status{ endstop, status, movemode, led, file } )
 
     }
 }
