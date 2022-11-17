@@ -1,5 +1,5 @@
 use anyhow::Result;
-use ffctl::{FlashForge, Temperature, Scanner, Temperatures, Status};
+use ffctl::{FlashForge, Temperature, Scanner, Temperatures};
 use colored::{Colorize, ColoredString};
 use clap::{Parser, Subcommand, ValueEnum};
 
@@ -24,6 +24,8 @@ enum Commands {
 
     /// List files in internal storage
     Ls,
+
+    Home,
 
     /// Turn the LED on or off
     Led { #[arg(value_enum)] on: OnOff },
@@ -62,7 +64,18 @@ fn main() -> Result<()> {
             let status = machine.status()?;
             let temp = machine.temperature()?;
 
-            print_status(&status);
+            println!("  Status: {}", colorize(&status.status));
+            println!("    Head: {}", colorize(&status.movemode));
+
+            if &status.status == "BUILDING_FROM_SD" {
+                let progress = machine.progress()?;
+                println!("Progress: {}%", progress);
+            }
+
+            // println!("     LED: {}", onoff(status.led));  // this doesn't actually work, it's always 1 regardless
+            println!("   Stops: X {} / Y {} / Z {}", onoff(status.endstop.x), onoff(status.endstop.y), onoff(status.endstop.z));
+            println!("    File: {}", &status.file);
+
             print_temperatures(&temp);
         },
         Commands::Scan { timeout } => {
@@ -75,6 +88,7 @@ fn main() -> Result<()> {
         Commands::Ls => {
             todo!()
         },
+        Commands::Home => { FlashForge::new(address)?.home()? },
         
 
     }
@@ -96,14 +110,6 @@ fn onoff(x: bool) -> ColoredString {
     if x { "ON".bold().red() } else { "off".blue() }
 }
 
-fn print_status(s: &Status) {
-    println!("Status: {}", colorize(&s.status));
-    println!("  Head: {}", colorize(&s.movemode));
-    println!("   LED: {}", onoff(s.led));
-    println!(" Stops: X {} / Y {} / Z {}", onoff(s.endstop.x), onoff(s.endstop.y), onoff(s.endstop.z));
-    println!("  File: {}", &s.file)
-}
-
 fn print_temperatures(t: &Temperatures) {
     if let Some(nozzle) = &t.nozzle { print_temperature("Nozzle", nozzle) }
     if let Some(bed) = &t.bed { print_temperature("Bed", bed) }
@@ -112,5 +118,5 @@ fn print_temperatures(t: &Temperatures) {
 fn print_temperature(name: &str, t: &Temperature) {
     let target = format!("{}", t.target);
     let target = if t.target == 0 { target.blue() } else { target.red() };
-    println!("{:>6}: {:>3}/{} °C", name, t.current, target)
+    println!("{:>8}: {:>3}/{} °C", name, t.current, target)
 }

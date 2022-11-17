@@ -84,6 +84,10 @@ impl FlashForge {
 
     }
 
+    pub fn home(&mut self) -> Result<()> {
+        self.command("G28", "X Y Z")?; Ok(())
+    }
+
     pub fn info(&mut self) -> Result<String> {
         self.command("M115", "")
     }
@@ -109,6 +113,23 @@ impl FlashForge {
         } else {
             bail!("Unexpected reply to M602: {}", reply)
         }
+    }
+
+    pub fn ls(&mut self) -> Result<Vec<String>> {
+        // M661 
+        todo!()
+    }
+
+    pub fn preview(&mut self, file: &str) -> Result<Vec<u8>> {
+        // M662 [filename]
+        todo!()
+    }
+
+    pub fn progress(&mut self) -> Result<u8> {
+        let out = self.command("M27", "")?;
+        Ok(out.strip_prefix("SD printing byte ").ok_or_else(|| anyhow!("Could not understand M27 output: {:?}", out))?
+              .strip_suffix("/100").ok_or_else(|| anyhow!("Could not understand M27 output: {:?}", out))?
+            .parse()?)
     }
 
     pub fn rename(&mut self, name: &str) -> Result<()> {
