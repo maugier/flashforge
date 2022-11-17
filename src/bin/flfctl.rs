@@ -86,7 +86,9 @@ fn main() -> Result<()> {
         },
         Commands::Rename { name } => { FlashForge::new(address)?.rename(&name)? },
         Commands::Ls => {
-            todo!()
+            for file in FlashForge::new(address)?.ls()? {
+                println!("{}", file);
+            }
         },
         Commands::Home => { FlashForge::new(address)?.home()? },
         

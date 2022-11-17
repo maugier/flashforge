@@ -3,7 +3,7 @@ use anyhow::{Error, Result, bail, anyhow};
 use itertools::Itertools;
 
 mod scanner;
-
+pub mod structured;
 pub use scanner::Scanner;
 
 pub struct FlashForge {
@@ -116,8 +116,14 @@ impl FlashForge {
     }
 
     pub fn ls(&mut self) -> Result<Vec<String>> {
-        // M661 
-        todo!()
+        self.command("M661", "")?;
+        let files = structured::Object::read(&mut self.buf)?
+            .into_vec()
+            .ok_or_else(|| anyhow!("Not a vector"))?
+            .into_iter()
+            .map(|obj| obj.into_string().ok_or_else(|| anyhow!("not a string")))
+            .collect::<Result<Vec<String>>>()?;
+        Ok(files)
     }
 
     pub fn preview(&mut self, file: &str) -> Result<Vec<u8>> {
