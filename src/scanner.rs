@@ -1,4 +1,4 @@
-use std::{net::{UdpSocket, SocketAddr, IpAddr}, time::Duration, io::ErrorKind};
+use std::{net::{UdpSocket, IpAddr}, time::Duration, io::ErrorKind};
 
 use anyhow::Result;
 

@@ -1,5 +1,6 @@
-use std::{net::{TcpStream, ToSocketAddrs, UdpSocket, SocketAddr}, io::{Write, BufReader, BufRead}};
-use anyhow::{Result, bail, anyhow};
+use std::{net::{TcpStream, ToSocketAddrs}, io::{Write, BufReader, BufRead}, str::FromStr};
+use anyhow::{Error, Result, bail, anyhow};
+use itertools::Itertools;
 
 mod scanner;
 
@@ -44,8 +45,6 @@ impl FlashForge {
         let sock = TcpStream::connect(addr)?;
         let buf = BufReader::new(sock.try_clone()?);
         let forge = Self { sock, buf };
-
-
 
         Ok(forge)
     }
@@ -111,14 +110,16 @@ impl FlashForge {
         }
     }
 
+    pub fn rename(&mut self, name: &str) -> Result<()> {
+        if name.len() > 32 { bail!("New name too long (32 bytes only)") }
+        if !name.is_ascii() { bail!("New name is not ascii, better safe than sorry.") }
+
+        self.command("M610", &name)?;
+        Ok(())
+    }
+
     pub fn status(&mut self) -> Result<Status> {
-
-        let reply = self.command("M119", "")?;
-
-        let lines: Vec<_> = reply.lines().collect();
-
-        todo!()
-
+        self.command("M119", "")?.parse()
     }
 
     pub fn temperature(&mut self) -> Result<Temperatures> {
@@ -143,4 +144,26 @@ impl FlashForge {
     }
 
 
+}
+
+impl FromStr for Status {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let lines: Vec<_> = s.lines().collect();
+
+        let (x,y,z) = lines[0]
+                .strip_prefix("Endstop: ")
+                .ok_or_else(|| anyhow!("no endstop line: {}", &lines[0]))?
+                .split_whitespace()
+                .tuples().next()
+                .ok_or_else(|| anyhow!("Not enough blocks in endstop line: {}", &lines[0]))?;
+
+        let x: u8 = x.strip_prefix("X-max:").ok_or_else(|| anyhow!("no x-max"))?.parse()?;
+        let y: u8 = y.strip_prefix("Y-max:").ok_or_else(|| anyhow!("no y-max"))?.parse()?;
+        let z: u8 = z.strip_prefix("Z-max:").ok_or_else(|| anyhow!("no z-max"))?.parse()?;
+
+        todo!()
+
+    }
 }
