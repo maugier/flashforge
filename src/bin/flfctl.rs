@@ -25,7 +25,7 @@ enum Commands {
     /// List files in internal storage
     Ls,
 
-    Home,
+    //Home,
 
     /// Turn the LED on or off
     Led { #[arg(value_enum)] on: OnOff },
@@ -90,7 +90,7 @@ fn main() -> Result<()> {
                 println!("{}", file);
             }
         },
-        Commands::Home => { FlashForge::new(address)?.home()? },
+        //Commands::Home => { FlashForge::new(address)?.home()? },
         
 
     }
